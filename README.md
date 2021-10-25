@@ -33,13 +33,14 @@ Generated files will be placed in ./output directory and a compress zip file wil
 - Step 2: Launch Cloud Shell \
 !["Image of Cloud Shell Console highlighting an icon with a greater-than and underscore"](images/console_button.png)
 
-- Step 3: Download Powershell Script
+- Step 3: Clone Script repo
 ```
-wget --header 'Authorization: token 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' https://raw.githubusercontent.com/niedzielak/azure-to-stratozone-export/develop/azure-export.ps1
+git clone https://github.com/googlestaging/azure-to-stratozone-export.git
 ```
 
 - Step 4: Run script to start collection
 ```
+cd azure-to-stratozone-export
 ./azure-export.ps1
 ```
 - Step 5: Verify output file has been generated
@@ -51,7 +52,7 @@ wget --header 'Authorization: token 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' ht
 
  - Step 7: Enter the path to the output file.
  ```
- /output/stz-import-files.zip
+ ./output/stz-import-files.zip
 ```
  - Step 8: Click Download. File is ready for upload to StratoZone
 
