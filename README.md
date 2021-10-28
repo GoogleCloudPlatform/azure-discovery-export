@@ -35,26 +35,33 @@ Generated files will be placed in ./output directory and a compress zip file wil
 
 - Step 3: Clone Script repo
 ```
-git clone https://github.com/googlestaging/azure-to-stratozone-export.git
+git clone https://github.com/GoogleCloudPlatform/azure-to-stratozone-export.git
 ```
 
-- Step 4: Run script to start collection
+- Step 4: Access cloned project directory
 ```
 cd azure-to-stratozone-export
+```
+
+- Step 5: Run script to start collection
+```
 ./azure-export.ps1
 ```
-- Step 5: Verify output file has been generated
+
+- Step 6: Verify output file has been generated
 ```
  ls ./output/stz-import-files.zip
 ```
-- Step 6: When the script completes, click on Upload/Download files icon.
+
+- Step 7: When the script completes, click on Upload/Download files icon.
  !["Image of Cloud Shell Download files"](images/download_output.png)
 
- - Step 7: Enter the path to the output file.
+ - Step 8: Enter the path to the output file.
  ```
  ./output/stz-import-files.zip
 ```
- - Step 8: Click Download. File is ready for upload to StratoZone
+
+ - Step 9: Click Download. File is ready for import into StratoZone portal.
 
  
 # Prerequisites

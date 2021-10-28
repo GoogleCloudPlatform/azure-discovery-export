@@ -37,6 +37,16 @@ function LogMessage
 	}
 }
 
+function CalculateNetworkDatePerSec($NetworkTotal){
+	try{
+		return $NetworkTotal /1800
+	}
+	catch{
+		Write-Host "Error calculating network perf data" -ForegroundColor yellow
+		return 0
+}
+}
+
 try{
 	if (!(Test-Path $outputPath)){
 		New-Item -itemType Directory -Path $outputPath 
@@ -115,22 +125,22 @@ foreach ($sub in $subList){
 			}
 		
 			$vmBasicInfo = [pscustomobject]@{
-				"VmId"=$vm.VmId
-				"Name"=$vm.Name
-				"PrimaryIP"=$primaryIp
-				"PublicIP"=$piptxt
-				"IpList"=$ipList
-				"TotalDiskAllocated(GB)"=""
-				"TotalDiskUsed(GB)"=""
-				"Size"=$vm.HardwareProfile.VmSize
-				"ProcessorNo"=$vmSizeInfo.NumberOfCores
-				"Memory"=$vmSizeInfo.MemoryInMb
-				"Location"=$vm.Location
+				"MachineId"=$vm.VmId
+				"MachineName"=$vm.Name
+				"PrimaryIPAddress"=$primaryIp
+				"PublicIPAddress"=$piptxt
+				"IpAddressListSemiColonDelimited"=$ipList
+				"TotalDiskAllocatedGiB"=""
+				"TotalDiskUsedGiB"=""
+				"MachineTypeLabel"=$vm.HardwareProfile.VmSize
+				"AllocatedProcessorCoreCount"=$vmSizeInfo.NumberOfCores
+				"MemoryMiB"=$vmSizeInfo.MemoryInMb
+				"HostingLocation"=$vm.Location
 				"OsType"=$vm.StorageProfile.osDisk.OsType
-				"Publisher"=$vm.StorageProfile.ImageReference.Publisher
+				"OsPublisher"=$vm.StorageProfile.ImageReference.Publisher
 				"OsName"=$vm.StorageProfile.ImageReference.Offer
 				"OsVersion"=$vm.StorageProfile.ImageReference.Sku
-				"Status"=$vmStatusInfo.Statuses[1].DisplayStatus
+				"MachineStatus"=$vmStatusInfo.Statuses[1].DisplayStatus
 				"ProvisioningState"=$vmStatusInfo.Statuses[0].DisplayStatus
 				"CreateDate"=$vmStatusInfo.Statuses[0].Time
 				"IsPhysical"="0"
@@ -141,7 +151,7 @@ foreach ($sub in $subList){
 			#collect all tags assigned to VM
 			foreach($key in $vm.Tags.Keys){
 				$vmTags = [pscustomobject]@{
-					"VmId"=$vm.VmId
+					"MachineId"=$vm.VmId
 					"Key"= $key
 					"Value"= $vm.Tags[$key]		
 				}
@@ -151,54 +161,53 @@ foreach ($sub in $subList){
 			#collect info on all disks attached tot he VM
 			foreach($disk in $vm.StorageProfile.DataDisks){
 				$vmDataDisk = [pscustomobject]@{
-					"VmId"=$vm.VmId
-					"DiskName"=$disk.Name
-					"Size"=$disk.DiskSizeGB
-					"Used"="0"
-					"StorageType"=$disk.ManagedDisk.StorageAccountType
+					"MachineId"=$vm.VmId
+					"DiskLabel"=$disk.Name
+					"SizeInGib"=$disk.DiskSizeGB
+					"UsedInGib"="0"
+					"StorageTypeLabel"=$disk.ManagedDisk.StorageAccountType
 				}
 				$vmDisksList += $vmDataDisk
 			}
 			
 			#Add OS disk to the list of disks for VM
 			$vmOsDisk = [pscustomobject]@{
-				"VmId"=$vm.VmId
-				"DiskName"=$vm.StorageProfile.OSDisk.Name
-				"Size"=$vm.StorageProfile.OSDisk.DiskSizeGB
-				"Used"="0"
-				"StorageType"=$vm.StorageProfile.OSDisk.ManagedDisk.StorageAccountType
+				"MachineId"=$vm.VmId
+				"DiskLabel"=$vm.StorageProfile.OSDisk.Name
+				"SizeInGib"=$vm.StorageProfile.OSDisk.DiskSizeGB
+				"UsedInGib"="0"
+				"StorageTypeLabel"=$vm.StorageProfile.OSDisk.ManagedDisk.StorageAccountType
 			}
 			$vmDisksList += $vmOsDisk
 
 			$endTime = Get-Date
 			$startTime = $endTime.AddDays(-30)
-
-			#"Percentage CPU,Available Memory Bytes,Network Out Total"
-			$vmCpuMatrics = Get-AzMetric -ResourceId $vm.Id -MetricName "Percentage CPU" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-			$vmMemMatrics = Get-AzMetric -ResourceId $vm.Id -MetricName "Available Memory Bytes" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-			$vmDiskRead = Get-AzMetric -ResourceId $vm.Id -MetricName "Disk Read Operations/Sec" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-			$vmDiskWrite = Get-AzMetric -ResourceId $vm.Id -MetricName "Disk Write Operations/Sec" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-			$vmNetOut = Get-AzMetric -ResourceId $vm.Id -MetricName "Network Out Total" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-			$vmNetIn = Get-AzMetric -ResourceId $vm.Id -MetricName "Network In Total" -EndTime $endTime -StartTime  $startTime -TimeGrain 1:00:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-
-			for($i =0;$i -lt $vmCpuMatrics.Data.Count; $i++){
-				try{
-					$vmPerfMetrics = [pscustomobject]@{
-						"VmId"=$vm.VmId
-						"TimeStamp"=$vmCpuMatrics.Data[$i].TimeStamp
-						"CpuPercent"=$vmCpuMatrics.Data[$i].Average
-						"AvailableMemory"=$vmMemMatrics.Data[$i].Average
-						"DiskReadOperations"=$vmDiskRead.Data[$i].Average
-						"DiskWriteOperations"=$vmDiskWrite.Data[$i].Average
-						"NetworkOut"=$vmNetOut.Data[$i].Total
-						"NetworkIn"=$vmNetIn.Data[$i].Total
+			
+			$metricName = "Percentage CPU,Available Memory Bytes,Disk Read Operations/Sec,Disk Write Operations/Sec,Network Out Total,Network In Total"
+			$vmMetric = Get-AzMetric -ResourceId $vm.Id -MetricName $metricName -EndTime $endTime -StartTime  $startTime -TimeGrain 0:30:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+			
+			$perfDataCount = $vmMetric[0].Data.Count
+			
+			if($vmMetric.Count -gt 5){
+				for($i =0;$i -lt $perfDataCount; $i++){
+					try{
+						$vmPerfMetrics = [pscustomobject]@{
+							"MachineId"=$vm.VmId
+							"TimeStamp"=$vmMetric[0].Data[$i].TimeStamp
+							"CpuUtilizationPercentage"=$vmMetric[0].Data[$i].Average
+							"AvailableMemoryBytes"=$vmMetric[1].Data[$i].Average
+							"DiskReadOperationsPerSec"=$vmMetric[2].Data[$i].Average
+							"DiskWriteOperationsPerSec"=$vmMetric[3].Data[$i].Average
+							"NetworkBytesPerSecSent"=CalculateNetworkDatePerSec($vmMetric[4].Data[$i].Total)
+							"NetworkBytesPerSecReceived"=CalculateNetworkDatePerSec($vmMetric[5].Data[$i].Total)
+							}
+						$vmPerfData += $vmPerfMetrics
+					 	}
+					catch{
+						LogMessage($_.Exception.Message)
 					}
 				}
-				catch{
-						LogMessage($_.Exception.Message)
-				}
 				
-				$vmPerfData += $vmPerfMetrics
 			}
 				
 			$vmCount = $vmCount + 1
