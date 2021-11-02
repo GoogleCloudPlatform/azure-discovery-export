@@ -23,6 +23,7 @@ $outputPath = "$(Get-Location)\output\"
 $LogFile = "$outputPath\stratozone-azure-export.log"
 
 
+# Write message to log. Timestamp is added along with the message
 function LogMessage
 {
     param(
@@ -37,6 +38,7 @@ function LogMessage
 	}
 }
 
+# Divide the network data by the time period used in the query
 function CalculateNetworkDatePerSec($NetworkTotal){
 	try{
 		return $NetworkTotal /1800
@@ -44,9 +46,10 @@ function CalculateNetworkDatePerSec($NetworkTotal){
 	catch{
 		Write-Host "Error calculating network perf data" -ForegroundColor yellow
 		return 0
-}
+	}
 }
 
+# Delete data from previous executions
 try{
 	if (!(Test-Path $outputPath)){
 		New-Item -itemType Directory -Path $outputPath 
@@ -63,6 +66,7 @@ catch{
 
 LogMessage("Starting collection script")
 
+# Loop through all subscriptions user has access to
 foreach ($sub in $subList){
 	LogMessage("Processing Subscription $sub.Name")
 
@@ -76,6 +80,7 @@ foreach ($sub in $subList){
 
 	$rgList = Get-AzResourceGroup 
 
+	# Loop through all the resource groups in subscription
 	foreach($rg in $rgList){
 		$rgCount = $rgCount +1
 
@@ -86,8 +91,9 @@ foreach ($sub in $subList){
 		LogMessage("VM Count  $($vmList.Length)")
 		Write-Progress -Activity "Data Collection" -Status "Collecting Resource Group $rgCount of $($rgList.Length)"
 
+		# Loop through all VMs in resource group
 		foreach($vm in $vmList){
-			#Write-Host $vm.Name
+			
 			try{
 				$vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | where{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
 			}
@@ -110,11 +116,14 @@ foreach ($sub in $subList){
 			foreach($nic in $vm.NetworkProfile.NetworkInterfaces){
 				$nicConfig = Get-AzResource -ResourceId $nic.Id | Get-AzNetworkInterface
 				foreach($ipConfig in $nicConfig.IpConfigurations){
+					$ipList = $ipList + $ipConfig.PrivateIpAddress + ";"
+
 					foreach($pip in $ipConfig.PublicIpAddress){
 						$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
 						$piptxt = $pubIp.IpAddress 
+						$ipList = $ipList + $piptxt + ";"
 					}
-					$ipList = $ipList + $ipConfig.PrivateIpAddress + ";"
+					
 					if ($primaryIp -eq ""){
 						$primaryIp = $ipConfig.PrivateIpAddress
 					}
@@ -123,7 +132,8 @@ foreach ($sub in $subList){
 			if($ipList.Length -gt 1){
 				$ipList = $ipList.Substring(0,$ipList.Length -1)
 			}
-		
+			
+			# TotalDiskAllocatedGiB and TotalDiskUsedGiB are used for manual entry and will be empty when collecting using scripts
 			$vmBasicInfo = [pscustomobject]@{
 				"MachineId"=$vm.VmId
 				"MachineName"=$vm.Name
@@ -148,7 +158,7 @@ foreach ($sub in $subList){
 			}
 			$vmObjectList += $vmBasicInfo
 
-			#collect all tags assigned to VM
+			# collect all tags assigned to VM
 			foreach($key in $vm.Tags.Keys){
 				$vmTags = [pscustomobject]@{
 					"MachineId"=$vm.VmId
@@ -158,24 +168,26 @@ foreach ($sub in $subList){
 				$vmTagsList += $vmTags
 			}
 
-			#collect info on all disks attached tot he VM
+			# collect info on all disks attached tot he VM
+			# UsedInGib data is unavailable in Azure and it will be left empty.
 			foreach($disk in $vm.StorageProfile.DataDisks){
 				$vmDataDisk = [pscustomobject]@{
 					"MachineId"=$vm.VmId
 					"DiskLabel"=$disk.Name
 					"SizeInGib"=$disk.DiskSizeGB
-					"UsedInGib"="0"
+					"UsedInGib"=""
 					"StorageTypeLabel"=$disk.ManagedDisk.StorageAccountType
 				}
 				$vmDisksList += $vmDataDisk
 			}
 			
-			#Add OS disk to the list of disks for VM
+			# Add OS disk to the list of disks for VM
+			# UsedInGib data is unavailable in Azure and it will be left empty.
 			$vmOsDisk = [pscustomobject]@{
 				"MachineId"=$vm.VmId
 				"DiskLabel"=$vm.StorageProfile.OSDisk.Name
 				"SizeInGib"=$vm.StorageProfile.OSDisk.DiskSizeGB
-				"UsedInGib"="0"
+				"UsedInGib"=""
 				"StorageTypeLabel"=$vm.StorageProfile.OSDisk.ManagedDisk.StorageAccountType
 			}
 			$vmDisksList += $vmOsDisk
@@ -218,6 +230,7 @@ foreach ($sub in $subList){
 Write-Host "VM Count: " $vmCount
 LogMessage("VM Count: $vmCount")
 
+# Writ all collected data to csv files
 if($vmCount -gt 0){
 	try{
 		LogMessage("Write data to files")
