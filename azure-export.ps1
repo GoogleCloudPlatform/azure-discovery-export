@@ -144,7 +144,7 @@ foreach ($sub in $subList){
 				"TotalDiskUsedGiB"=""
 				"MachineTypeLabel"=$vm.HardwareProfile.VmSize
 				"AllocatedProcessorCoreCount"=$vmSizeInfo.NumberOfCores
-				"MemoryMiB"=$vmSizeInfo.MemoryInMb
+				"MemoryGiB"= [math]::Round($vmSizeInfo.MemoryInMb /1024,1)
 				"HostingLocation"=$vm.Location
 				"OsType"=$vm.StorageProfile.osDisk.OsType
 				"OsPublisher"=$vm.StorageProfile.ImageReference.Publisher
