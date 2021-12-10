@@ -154,6 +154,7 @@ foreach ($sub in $subList){
 				"ProvisioningState"=$vmStatusInfo.Statuses[0].DisplayStatus
 				"CreateDate"=$vmStatusInfo.Statuses[0].Time
 				"IsPhysical"="0"
+				"Source"="Azure"
 
 			}
 			$vmObjectList += $vmBasicInfo
