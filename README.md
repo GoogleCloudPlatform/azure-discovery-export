@@ -50,7 +50,7 @@ cd azure-to-stratozone-export
 
 - Step 6: Verify output file has been generated
 ```
- ls ./output/stz-import-files.zip
+ ls ./azure-import-files.zip
 ```
 
 - Step 7: When the script completes, click on Upload/Download files icon.
