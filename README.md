@@ -58,7 +58,7 @@ cd azure-to-stratozone-export
 
  - Step 8: Enter the path to the output file.
  ```
- ./output/stz-import-files.zip
+ /azure-to-stratozone-export/azure-import-files.zip
 ```
 
  - Step 9: Click Download. File is ready for import into StratoZone portal.
