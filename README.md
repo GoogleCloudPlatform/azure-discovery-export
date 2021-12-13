@@ -17,8 +17,9 @@ limitations under the License.
 # Solution Overview
 This script collects information from provided Azure account and generates csv files for import into StratoZone for analysis.
 Generated files will be placed in ./output directory and a compress zip file will be created that can be imported directly to StratoZone using the import procedure. 
+
 **NOTE:** Script will collect data only on the instances user executing the script has access to. 
- 
+
 
 - [Solution Overview](#solution-overview)
 - [StratoZone Azure export usage](#stratozone-azure-export-usage)
