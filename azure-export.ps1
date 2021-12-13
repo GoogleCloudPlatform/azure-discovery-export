@@ -39,7 +39,7 @@ function LogMessage
 }
 
 # Divide the network data by the time period used in the query
-function CalculateNetworkDatePerSec($NetworkTotal){
+function CalculateNetworkDataPerSec($NetworkTotal){
 	try{
 		return $NetworkTotal /1800
 	}
@@ -208,11 +208,11 @@ foreach ($sub in $subList){
 							"MachineId"=$vm.VmId
 							"TimeStamp"=$vmMetric[0].Data[$i].TimeStamp
 							"CpuUtilizationPercentage"=$vmMetric[0].Data[$i].Average
-							"AvailableMemoryBytes"=$vmMetric[1].Data[$i].Average
+							"AvailableMemoryBytes"=[math]::ceiling($vmMetric[1].Data[$i].Average)
 							"DiskReadOperationsPerSec"=$vmMetric[2].Data[$i].Average
 							"DiskWriteOperationsPerSec"=$vmMetric[3].Data[$i].Average
-							"NetworkBytesPerSecSent"=CalculateNetworkDatePerSec($vmMetric[4].Data[$i].Total)
-							"NetworkBytesPerSecReceived"=CalculateNetworkDatePerSec($vmMetric[5].Data[$i].Total)
+							"NetworkBytesPerSecSent"=CalculateNetworkDataPerSec($vmMetric[4].Data[$i].Total)
+							"NetworkBytesPerSecReceived"=CalculateNetworkDataPerSec($vmMetric[5].Data[$i].Total)
 							}
 						$vmPerfData += $vmPerfMetrics
 					 	}
