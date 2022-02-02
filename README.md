@@ -69,7 +69,7 @@ cd azure-to-stratozone-export
 
  
 # Prerequisites
-  Azure Cloud Shell is the recommended environment to execute the collection script as it has all required components (PowerShell and Azure PowerShell module) arelay installed.
+  Azure Cloud Shell is the recommended environment to execute the collection script as it has all required components (PowerShell and Azure PowerShell module) already installed.
 
   If the script will be executed from a workstation following components will need to be installed
   - PowerShell 7.0.6 LTS, PowerShell 7.1.3, or higher 
@@ -80,4 +80,4 @@ cd azure-to-stratozone-export
   The script needs read-only access to the Azure Subscriptions where collection will be performed.
 
 # Support
-If the execution of the scipt fails please contact support-stratozone@google.com and attach log file located in ./output directory.
+If the execution of the script fails please contact support-stratozone@google.com and attach log file located in ./output directory.

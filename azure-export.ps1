@@ -96,7 +96,7 @@ foreach ($sub in $subList){
 		foreach($vm in $vmList){
 			
 			try{
-				$vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | where{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
+				$vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | Where-Object{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
 			}
 			catch{
 				Write-Host "Error vmSizeInfo" -ForegroundColor yellow
