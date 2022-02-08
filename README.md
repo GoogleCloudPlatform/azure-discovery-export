@@ -80,4 +80,4 @@ cd azure-to-stratozone-export
   The script needs read-only access to the Azure Subscriptions where collection will be performed.
 
 # Support
-If the execution of the script fails please contact support-stratozone@google.com and attach log file located in ./output directory.
+If the execution of the script fails please contact stratozone-support@google.com and attach log file located in ./output directory.
