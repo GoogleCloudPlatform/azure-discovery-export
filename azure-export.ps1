@@ -93,7 +93,7 @@ function SetDiskInfo{
 		# VM 
 		[Parameter(Mandatory = $true)]
 		$vm,
-		#VM status
+		#vm Status info
 		[Parameter(Mandatory = $true)]
 		$vmStatusInfo
 	)
@@ -102,6 +102,9 @@ function SetDiskInfo{
 	# collect info on all disks attached tot he VM
 	# UsedInGib data is unavailable in Azure and it will be left empty.
 	foreach($disk in $vm.StorageProfile.DataDisks){
+		$diskSize = 52.5
+		$diskType = "Premium_LRS"
+
 		try{
 			if($vmStatusInfo.Statuses[1].DisplayStatus -ne "VM running"){
 				if($disk.ManagedDisk){
@@ -159,8 +162,8 @@ function SetDiskInfo{
 		}
 	}
 	catch{
-		$diskSize = 52.5
 		LogMessage("Unable to collect OS disk info for: " + $vm.Name + " with state: " + $vmStatusInfo.Statuses[1].DisplayStatus)
+		$diskSize = 52.5
 	}
 	if([string]::IsNullOrWhiteSpace($diskType)){
 		$diskType = "Standard_LRS"
@@ -200,7 +203,7 @@ function SetVmTags{
 		$global:vmTagsList += $vmTags
 	}
 
-	if(![string]::IsNullOrWhiteSpace($tagKey) && ![string]::IsNullOrWhiteSpace($tagValue)){
+	if(![string]::IsNullOrWhiteSpace($tagKey) -And ![string]::IsNullOrWhiteSpace($tagValue)){
 		$vmTags = [pscustomobject]@{
 			"MachineId"=$vm.VmId
 			"Key"= $tagKey
@@ -208,8 +211,6 @@ function SetVmTags{
 		}
 		$global:vmTagsList += $vmTags		
 	}
-
-		
 
 	return
 }
@@ -281,7 +282,7 @@ function GetVssVmIpInfo{
 			}
 		}
 	}
-	if([string]::IsNullOrWhiteSpace( $publicIp)){
+	if(![string]::IsNullOrWhiteSpace($publicIp)){
 		$ipInfo.ipList = $ipInfo.ipList + $publicIp + ";"
 	}
 
@@ -313,8 +314,10 @@ function GetVmIpinfo{
 
 			foreach($pip in $ipConfig.PublicIpAddress){
 				$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
-				$ipInfo.publicIp = $pubIp.IpAddress 
-				$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+				if($pubIp.IpAddress -ne "Not Assigned" -And ![string]::IsNullOrWhiteSpace($pubIp.IpAddress)){
+					$ipInfo.publicIp = $pubIp.IpAddress 
+					$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+				}
 			}
 			
 			if ([string]::IsNullOrWhiteSpace($ipInfo.primaryIp)){
