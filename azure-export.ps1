@@ -11,18 +11,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-
-.PARAMETER no_perf
-Default False. Use to indicate whether performance data will collected.
-
 #>
 
-# Version 1.2
+# Version 1.3.1
+
 
 [cmdletbinding()]
 param (
-  [switch]$no_perf=$false
+  [switch]$no_perf=$false,
+  [int]$threadLimit=30
 )
+<#
+	.DESCRIPTION
+	Collects VM data from existing Azure subscriptions
+
+	.PARAMETER no_perf
+	Default False. Use to indicate whether performance data will collected.
+
+	.PARAMETER threadLimit
+	DEfault 30. Use to set the maximum number of threads to start
+
+	.EXAMPLE
+    PS> ./azure-export -no_perf
+    PS> ./azure-export -threadLimit 40
+#>
 
 $global:vmObjectList = @()
 $global:vmTagsList = @()
@@ -30,7 +42,7 @@ $global:vmDisksList = @()
 $global:vmPerfData = @()
 
 $subList = Get-AzSubscription
-$outputPath = "$(Get-Location)\output\"
+$global:outputPath = "$(Get-Location)\output\"
 $LogFile = "$outputPath\stratozone-azure-export.log"
 
 
@@ -39,7 +51,6 @@ $ipInfo = [PSCustomObject]@{
     primaryIp    = ""
     ipList       = ""
   }
-
 
 # Write message to log. Timestamp is added along with the message
 function LogMessage
@@ -56,18 +67,9 @@ function LogMessage
 	}
 }
 
-# Divide the network data by the time period used in the query
-function CalculateNetworkDataPerSec($NetworkTotal){
-	try{
-		return $NetworkTotal /1800
-	}
-	catch{
-		Write-Host "Error calculating network perf data" -ForegroundColor yellow
-		return 0
-	}
-}
 
-#get disk info for dealicated VM
+
+#get disk info for deallocated VM
 function GetDiskInfoForPoweredOffVm{
 	param
 	(
@@ -87,13 +89,13 @@ function GetDiskInfoForPoweredOffVm{
 }
 
 #Add disk data to the global array for specified VM
-function SetDiskInfo{
+Function SetDiskInfo{
 	param
 	(
 		# VM 
 		[Parameter(Mandatory = $true)]
 		$vm,
-		#vm Status info
+		#VM status info
 		[Parameter(Mandatory = $true)]
 		$vmStatusInfo
 	)
@@ -101,10 +103,13 @@ function SetDiskInfo{
 	
 	# collect info on all disks attached tot he VM
 	# UsedInGib data is unavailable in Azure and it will be left empty.
-	foreach($disk in $vm.StorageProfile.DataDisks){
-		$diskSize = 52.5
-		$diskType = "Premium_LRS"
 
+    $diskSize = 52.5
+	$diskType = "Premium_LRS"
+
+	foreach($disk in $vm.StorageProfile.DataDisks){
+        $diskSize = 52.5
+	    $diskType = "Premium_LRS"
 		try{
 			if($vmStatusInfo.Statuses[1].DisplayStatus -ne "VM running"){
 				if($disk.ManagedDisk){
@@ -125,10 +130,8 @@ function SetDiskInfo{
 		}
 		catch{
 			LogMessage("Unable to collect data disk info for: " + $vm.Name + " with state: " + $vmStatusInfo.Statuses[1].DisplayStatus)
-			$diskSize = 52.5
-		}
-
-		$vmDataDisk = [pscustomobject]@{
+       }
+      	$vmDataDisk = [pscustomobject]@{
 				"MachineId"=$vm.VmId
 				"DiskLabel"=$disk.Name
 				"SizeInGib"=$diskSize 
@@ -142,6 +145,9 @@ function SetDiskInfo{
 	
 	# Add OS disk to the list of disks for VM
 	# UsedInGib data is unavailable in Azure and it will be left empty.
+    $diskSize = 52.5
+	$diskType = "Premium_LRS"
+    
 	try{
 		if($vmStatusInfo.Statuses[1].DisplayStatus -eq "VM running"){
 			$diskSize = $vm.StorageProfile.OSDisk.DiskSizeGB
@@ -163,11 +169,7 @@ function SetDiskInfo{
 	}
 	catch{
 		LogMessage("Unable to collect OS disk info for: " + $vm.Name + " with state: " + $vmStatusInfo.Statuses[1].DisplayStatus)
-		$diskSize = 52.5
-	}
-	if([string]::IsNullOrWhiteSpace($diskType)){
-		$diskType = "Standard_LRS"
-	}
+ 	}
 
 	$vmOsDisk = [pscustomobject]@{
 		"MachineId"=$vm.VmId
@@ -184,12 +186,13 @@ function SetDiskInfo{
 function SetVmTags{
 	param
 	(
+		#VM
 		[Parameter(Mandatory = $true)]
 		$vm,
-
+		#Tag Key
 		[Parameter(Mandatory = $false)]
 		$tagKey,
-
+		#Tag Value
 		[Parameter(Mandatory = $false)]
 		$tagValue
 	)
@@ -215,45 +218,7 @@ function SetVmTags{
 	return
 }
 
-#Add performance data to the global array for specified VM
-function SetPerformanceInfo{
-	param
-	(
-		# VM 
-		[Parameter(Mandatory = $true)]
-		$vm
-	)
 
-	$endTime = Get-Date
-	$startTime = $endTime.AddDays(-30)
-	
-	$metricName = "Percentage CPU,Available Memory Bytes,Disk Read Operations/Sec,Disk Write Operations/Sec,Network Out Total,Network In Total"
-	$vmMetric = Get-AzMetric -ResourceId $vm.Id -MetricName $metricName -EndTime $endTime -StartTime  $startTime -TimeGrain 0:30:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-	
-	$perfDataCount = $vmMetric[0].Data.Count
-	
-	if($vmMetric.Count -gt 5){
-		for($i =0;$i -lt $perfDataCount; $i++){
-			try{
-				$vmPerfMetrics = [pscustomobject]@{
-					"MachineId"=$vm.VmId
-					"TimeStamp"=$vmMetric[0].Data[$i].TimeStamp
-					"CpuUtilizationPercentage"=$vmMetric[0].Data[$i].Average
-					"AvailableMemoryBytes"=[math]::ceiling($vmMetric[1].Data[$i].Average)
-					"DiskReadOperationsPerSec"=$vmMetric[2].Data[$i].Average
-					"DiskWriteOperationsPerSec"=$vmMetric[3].Data[$i].Average
-					"NetworkBytesPerSecSent"=CalculateNetworkDataPerSec($vmMetric[4].Data[$i].Total)
-					"NetworkBytesPerSecReceived"=CalculateNetworkDataPerSec($vmMetric[5].Data[$i].Total)
-					}
-				$global:vmPerfData += $vmPerfMetrics
-				}
-			catch{
-				LogMessage($_.Exception.Message)
-			}
-		}
-		
-	}
-}
 
 #Get IP info for VM that is part of a scale set
 function GetVssVmIpInfo{
@@ -385,6 +350,7 @@ function SetVmInfo{
 	return
 }
 
+
 # Delete data from previous executions
 try{
 	if (!(Test-Path $outputPath)){
@@ -402,7 +368,7 @@ catch{
 
 LogMessage("Starting collection script")
 $vmCount = 0
-
+$vmsscount = 0
 # Loop through all subscriptions user has access to
 foreach ($sub in $subList){
 	LogMessage("Processing Subscription $sub.Name")
@@ -410,73 +376,97 @@ foreach ($sub in $subList){
 	Select-AzSubscription -SubscriptionId $sub.Id
 	Set-AzContext -SubscriptionId $sub.Id
 
-	
-	$rgCount = 0
+	$vmPerfList = @()
 	$vmStatusInfo = $null
 	$vmSizeInfo = $null
 
-	$rgList = Get-AzResourceGroup 
-
-	# Loop through all the resource groups in subscription
-	foreach($rg in $rgList){
-		$rgCount = $rgCount +1
-
-		LogMessage("Processing Resource Group $($rg.ResourceGroupName)")
-
-		$vmList = Get-AzVM -ResourceGroupName $rg.ResourceGroupName -Status -erroraction 'silentlycontinue'
+	$vmList = Get-AzVM -erroraction 'silentlycontinue'
 		
-		Write-Progress -Activity "Data Collection" -Status "Collecting Resource Group $rgCount of $($rgList.Length)"
+    # Loop through all VMs in resource group
+    foreach($vm in $vmList){
 
-		# Loop through all VMs in resource group
-		foreach($vm in $vmList){
-			$vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | Where-Object{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
-			
-			if(-Not $vmSizeInfo) {
-				Write-Host "Error vmSizeInfo" -ForegroundColor yellow}
-			
-			$vmStatusInfo = Get-AzVM -Name $vm.Name -ResourceGroupName $vm.ResourceGroupName -Status -erroraction 'silentlycontinue'
-			if(-Not $vmStatusInfo) {
-				Write-Host "Error vmStatusInfo" -ForegroundColor yellow}
-			
-			$ipInfo = GetVmIpinfo($vm)
-			
-			SetVmTags $vm
-			SetVmInfo $vm $ipInfo $vmSizeInfo $vmStatusInfo $vm.HardwareProfile.VmSize
-			SetDiskInfo $vm $vmStatusInfo
-			if(-Not $no_perf){
-				SetPerformanceInfo $vm
-			}	
-			$vmCount = $vmCount + 1
-		}
+        if($vmCount -eq 0 -or $vmCount % 5 -eq 0){
+            Write-Progress -Activity "VM Collection" -Status "$vmCount of $($vmList.Length)"
+        }
+        $vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | Where-Object{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
+        $vmStatusInfo = Get-AzVM -Name $vm.Name -ResourceGroupName $vm.ResourceGroupName -Status -erroraction 'silentlycontinue'
+        
+        if($vmSizeInfo -and $vmStatusInfo) {
+            $ipInfo = GetVmIpinfo($vm)
+        
+            SetVmTags $vm
+            SetVmInfo $vm $ipInfo $vmSizeInfo $vmStatusInfo $vm.HardwareProfile.VmSize
+            SetDiskInfo $vm $vmStatusInfo
 
+			#if enabled add vm vm to perf collection array
+            if(-Not $no_perf){
+                $vmPerfIds = [PSCustomObject]@{
+                    "vmID"   = $vm.VmId
+                    "rid"    = $vm.Id
+                    }
+                $vmPerfList += $vmPerfIds
+            }
+        }
+        	
+        $vmCount = $vmCount + 1
+    }
+    Write-Progress -Activity "VM Collection" -Status "$vmCount of $($vmList.Length)"
+    
 
-		LogMessage("Processing Vmss")
-		$vmssList = Get-AzVmss -ResourceGroupName $rg.ResourceGroupName -erroraction 'silentlycontinue'
-		
-		foreach($vmss in $vmssList){
-			$vmListfromVmss = Get-AzVmssVM -ResourceGroupName $vmss.ResourceGroupName -VMScaleSetName $vmss.Name
-			
-			foreach($vmFromVmss in $vmListfromVmss){
-				
-				$vmInfo = Get-AzVmssVM -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
-				$vmSizeInfo = Get-AzVMSize -Location $vmInfo.Location | Where-Object{$_.Name -eq $vmInfo.Sku.Name}
-				$vmStatusInfo = Get-AzVmssVM -InstanceView -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
-				
-				$piptxt = ""
-				$ipInfo = GetVssVmIpInfo $vmInfo $piptxt
+    LogMessage("Processing Vmss")
+    $vmssList = Get-AzVmss  -erroraction 'silentlycontinue'
+    
+    foreach($vmss in $vmssList){
+        $vmListfromVmss = Get-AzVmssVM -ResourceGroupName $vmss.ResourceGroupName -VMScaleSetName $vmss.Name
+        
+        if($vmsscount -eq 0 -or $vmsscount % 5 -eq 0){
+            Write-Progress -Activity "VMSS Collection" -Status "$vmsscount of $($vmssList.Length)"
+        }
+        
+        foreach($vmFromVmss in $vmListfromVmss){
+            
+            $vmInfo = Get-AzVmssVM -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
+            $vmSizeInfo = Get-AzVMSize -Location $vmInfo.Location | Where-Object{$_.Name -eq $vmInfo.Sku.Name}
+            $vmStatusInfo = Get-AzVmssVM -InstanceView -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
+            
+            $piptxt = ""
+            $ipInfo = GetVssVmIpInfo $vmInfo $piptxt
 
-				SetVmTags $vmInfo "ScaleSetName" $vmss.Name
-				SetVmInfo $vmInfo $ipInfo $vmSizeInfo $vmStatusInfo $vmInfo.Sku.Name
-				SetDiskInfo $vmInfo $vmStatusInfo
-				if(-Not $no_perf){
-					SetPerformanceInfo $vmInfo
-				}
-				$vmCount = $vmCount + 1
-			}
-		}
+            SetVmTags $vmInfo "ScaleSetName" $vmss.Name
+            SetVmInfo $vmInfo $ipInfo $vmSizeInfo $vmStatusInfo $vmInfo.Sku.Name
+            SetDiskInfo $vmInfo $vmStatusInfo
+            
+			#if enabled add vmss vm to perf collection array
+            if(-Not $no_perf){
+                $vmPerfIds = [PSCustomObject]@{
+                    "vmID"   = $vmInfo.VmId
+                    "rid"    = $vmInfo.Id
+                    }
+                $vmPerfList += $vmPerfIds
+            }
+            $vmCount = $vmCount + 1
+        }
 
-	}
+        $vmsscount = $vmsscount +1
+    }
+    
+    #Collect performance data using parallel processing option
+    if(-Not $no_perf){
+        Write-Progress -Activity "Performance Collection" -Status "$vmCount VMs"
+        LogMessage("Perf Collection using $threadLimit threads")
+        $returnPerfData = $vmPerfList | ForEach-Object -ThrottleLimit $threadLimit -Parallel {
+            Import-Module "$(Get-Location)/get-performance-data.psm1"
+            SetPerformanceInfo -ids $_
+        } 
+        $global:vmPerfData = $returnPerfData
+        
+        $runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
+        While($runningJobs -ne 0){
+        $runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
+        }
+    }
 }
+
 
 Write-Host "VM Count: " $vmCount
 LogMessage("VM Count: $vmCount")
@@ -488,11 +478,11 @@ if($vmCount -gt 0){
 		LogMessage("Write data to files")
 		Write-Progress -Activity "Data Collection" -Status "Write to output files"
 
-		$global:vmObjectList | Export-Csv -NoTypeInformation -Path "$outputPath\vmInfo.csv"
-		$global:vmTagsList | Export-Csv -NoTypeInformation -Path "$outputPath\tagInfo.csv"
-		$global:vmDisksList | Export-Csv -NoTypeInformation -Path "$outputPath\diskInfo.csv"
+		$global:vmObjectList | Export-Csv -NoTypeInformation -Path "$global:outputPath\vmInfo.csv"
+		$global:vmTagsList | Export-Csv -NoTypeInformation -Path "$global:outputPath\tagInfo.csv"
+		$global:vmDisksList | Export-Csv -NoTypeInformation -Path "$global:outputPath\diskInfo.csv"
 		if(-Not $no_perf){
-			$global:vmPerfData | Export-Csv -NoTypeInformation -Path "$outputPath\perfInfo.csv"
+			$global:vmPerfData | Export-Csv -NoTypeInformation -Path "$global:outputPath\perfInfo.csv"
 		}
 	}
 	catch{
