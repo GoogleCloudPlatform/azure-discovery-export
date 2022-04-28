@@ -67,7 +67,21 @@ cd azure-to-stratozone-export
 
  - Step 9: Click Download. File is ready for import into StratoZone portal.
 
- 
+
+# Script Optional Parameters
+* -no_perf - Default False. Use to indicate whether performance data will collected.
+```
+./azure-export -no_perf
+```
+* -threadLimit - Default 30. Use to set the maximum number of threads to start during performance data collection.
+```
+./azure-export -threadLimit 40
+```
+* -no_public_ip - Default False. Use to indicate whether public IP address will be collected.
+```
+./azure-export -no_public_ip
+```
+
 # Prerequisites
   Azure Cloud Shell is the recommended environment to execute the collection script as it has all required components (PowerShell and Azure PowerShell module) already installed.
 
@@ -78,6 +92,7 @@ cd azure-to-stratozone-export
 
 # Azure Permissions
   The script needs read-only access to the Azure Subscriptions where collection will be performed.
+
 
 # Support
 If the execution of the script fails please contact stratozone-support@google.com and attach log file located in ./output directory.

@@ -13,13 +13,14 @@ limitations under the License.
 
 #>
 
-# Version 1.3.1
+# Version 1.3.3
 
 
 [cmdletbinding()]
 param (
   [switch]$no_perf=$false,
-  [int]$threadLimit=30
+  [int]$threadLimit=30,
+  [switch]$no_public_ip=$false
 )
 <#
 	.DESCRIPTION
@@ -29,11 +30,15 @@ param (
 	Default False. Use to indicate whether performance data will collected.
 
 	.PARAMETER threadLimit
-	DEfault 30. Use to set the maximum number of threads to start
+	Default 30. Use to set the maximum number of threads to start
+
+	.PARAMETER no_public_ip
+	Default False. Use to indicate whether public IP address will be collected and stored.
 
 	.EXAMPLE
     PS> ./azure-export -no_perf
     PS> ./azure-export -threadLimit 40
+	PS> ./azure-export -no_public_ip
 #>
 
 $global:vmObjectList = @()
@@ -43,7 +48,7 @@ $global:vmPerfData = @()
 
 $subList = Get-AzSubscription
 $global:outputPath = "$(Get-Location)\output\"
-$LogFile = "$outputPath\stratozone-azure-export.log"
+$global:LogFile = "$outputPath\stratozone-azure-export.log"
 
 
 $ipInfo = [PSCustomObject]@{
@@ -60,7 +65,7 @@ function LogMessage
 		[string]$Message
 	)
 	try{
-    	Add-content $LogFile -value ((Get-Date).ToString() + " - " + $Message)
+    	Add-content $global:LogFile -value ((Get-Date).ToString() + " - " + $Message)
 	}
 	catch{
 		Write-Host "Unable to Write to log file"
@@ -247,8 +252,10 @@ function GetVssVmIpInfo{
 			}
 		}
 	}
-	if(![string]::IsNullOrWhiteSpace($publicIp)){
-		$ipInfo.ipList = $ipInfo.ipList + $publicIp + ";"
+	if(-Not $no_public_ip){
+		if(![string]::IsNullOrWhiteSpace($publicIp)){
+			$ipInfo.ipList = $ipInfo.ipList + $publicIp + ";"
+		}
 	}
 
 	if($ipInfo.ipList.Length -gt 1){
@@ -277,11 +284,13 @@ function GetVmIpinfo{
 		foreach($ipConfig in $nicConfig.IpConfigurations){
 			$ipInfo.ipList = $ipInfo.ipList + $ipConfig.PrivateIpAddress + ";"
 
-			foreach($pip in $ipConfig.PublicIpAddress){
-				$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
-				if($pubIp.IpAddress -ne "Not Assigned" -And ![string]::IsNullOrWhiteSpace($pubIp.IpAddress)){
-					$ipInfo.publicIp = $pubIp.IpAddress 
-					$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+			if(-Not $no_public_ip){
+				foreach($pip in $ipConfig.PublicIpAddress){
+					$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
+					if($pubIp.IpAddress -ne "Not Assigned" -And ![string]::IsNullOrWhiteSpace($pubIp.IpAddress)){
+						$ipInfo.publicIp = $pubIp.IpAddress 
+						$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+					}
 				}
 			}
 			
@@ -426,8 +435,13 @@ foreach ($sub in $subList){
         foreach($vmFromVmss in $vmListfromVmss){
             
             $vmInfo = Get-AzVmssVM -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
+			if(!$vmInfo){continue}
+
             $vmSizeInfo = Get-AzVMSize -Location $vmInfo.Location | Where-Object{$_.Name -eq $vmInfo.Sku.Name}
+			if(!$vmSizeInfo){continue}
+
             $vmStatusInfo = Get-AzVmssVM -InstanceView -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
+			if(!$vmStatusInfo){continue}
             
             $piptxt = ""
             $ipInfo = GetVssVmIpInfo $vmInfo $piptxt
@@ -450,21 +464,34 @@ foreach ($sub in $subList){
         $vmsscount = $vmsscount +1
     }
     
-    #Collect performance data using parallel processing option
-    if(-Not $no_perf){
-        Write-Progress -Activity "Performance Collection" -Status "$vmCount VMs"
-        LogMessage("Perf Collection using $threadLimit threads")
-        $returnPerfData = $vmPerfList | ForEach-Object -ThrottleLimit $threadLimit -Parallel {
-            Import-Module "$(Get-Location)/get-performance-data.psm1"
-            SetPerformanceInfo -ids $_
-        } 
-        $global:vmPerfData = $returnPerfData
-        
-        $runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
-        While($runningJobs -ne 0){
-        $runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
-        }
-    }
+	#Collect performance data using parallel processing option
+    try{
+		if(-Not $no_perf){
+			Write-Progress -Activity "Performance Collection" -Status "$vmCount VMs"
+			LogMessage("Perf Collection using $threadLimit threads")
+			
+			$returnPerfData = $vmPerfList | ForEach-Object -ThrottleLimit $threadLimit -Parallel {
+				try{
+					Import-Module "$(Get-Location)/get-performance-data.psm1"
+					if($_){
+						SetPerformanceInfo -ids $_ -log $using:LogFile
+					}
+				}
+				catch{
+					ModuleLogMessage -message "Unable to collect performance data for vm. $_" -log $using:LogFile
+				}
+			}
+			$global:vmPerfData = $returnPerfData
+			
+			$runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
+			While($runningJobs -ne 0){
+				$runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
+			}
+		}
+	}
+	catch{
+		LogMessage("Error collecting performance. $_")
+	}
 }
 
 
@@ -501,6 +528,9 @@ if($vmCount -gt 0){
 Write-Host "Collection Completed"
 if($no_perf){
 	write-host "No performance data collected"
+}
+if($no_public_ip){
+	write-host "No public IP data collected"
 }
 				
 LogMessage("Collection Completed")
