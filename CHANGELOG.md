@@ -1,3 +1,12 @@
+### 1.3.3 (2022-04-28)
+
+### Bug Fixes
+* Capture errors occurring during performance data retrieval.
+
+### Improvement
+* Add ability to skip public IP address collection. 
+
+
 ### 1.1.6 (2022-02-22)
 
 ### Bug Fixes
@@ -6,3 +15,5 @@
 
 ### Improvement
 * increase VM performance data collection using threads
+
+
