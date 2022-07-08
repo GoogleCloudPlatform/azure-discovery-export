@@ -1,3 +1,8 @@
+### 1.4.1 (2022-04-28)
+
+### Improvement
+* Add resource collection. List of deployed resource will be imported along with VM data to provide possible mapping to GCP resources.
+
 ### 1.3.3 (2022-04-28)
 
 ### Bug Fixes
