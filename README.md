@@ -81,6 +81,10 @@ cd azure-to-stratozone-export
 ```
 ./azure-export -no_public_ip
 ```
+* -no_resources - Default False. Use to indicate whether deployed resources are collected.
+```
+./azure-export -no_resources
+```
 
 # Prerequisites
   Azure Cloud Shell is the recommended environment to execute the collection script as it has all required components (PowerShell and Azure PowerShell module) already installed.

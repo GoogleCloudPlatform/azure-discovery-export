@@ -13,14 +13,15 @@ limitations under the License.
 
 #>
 
-# Version 1.3.3
+# Version 1.4.1
 
 
 [cmdletbinding()]
 param (
   [switch]$no_perf=$false,
   [int]$threadLimit=30,
-  [switch]$no_public_ip=$false
+  [switch]$no_public_ip=$false,
+  [switch]$no_resources=$false
 )
 <#
 	.DESCRIPTION
@@ -35,16 +36,21 @@ param (
 	.PARAMETER no_public_ip
 	Default False. Use to indicate whether public IP address will be collected and stored.
 
+	.PARAMETER no_resources
+	Default False. Use to indicate whether resource collection is performed.
+
 	.EXAMPLE
     PS> ./azure-export -no_perf
     PS> ./azure-export -threadLimit 40
 	PS> ./azure-export -no_public_ip
+	PS> ./azure-export -no_resources
 #>
 
 $global:vmObjectList = @()
 $global:vmTagsList = @()
 $global:vmDisksList = @()
 $global:vmPerfData = @()
+$resourceListlist=@()
 
 $subList = Get-AzSubscription
 $global:outputPath = "$(Get-Location)\output\"
@@ -368,6 +374,7 @@ try{
 	else{
 		Remove-Item "$(Get-Location)\*.zip"
 		Remove-Item "$outputPath\*.csv"
+		Remove-Item "$outputPath\*.json"
 	}
 }
 catch{
@@ -388,6 +395,21 @@ foreach ($sub in $subList){
 	$vmPerfList = @()
 	$vmStatusInfo = $null
 	$vmSizeInfo = $null
+
+	if(-Not $no_resources){
+		#Get list of deployed resources
+		$resources = Get-AzResource 
+		foreach ($r in $resources) {
+			$resourceListlist+=New-Object -TypeName PSObject -Property @{
+				Name = $r.name
+				ResourceType = $r.ResourceType
+				Location=$r.Location
+				ResoureceGroup = $r.ResourceGroupName 
+				Tags = $r.tags
+				Source = "Azure"
+			}
+		}
+	}
 
 	$vmList = Get-AzVM -erroraction 'silentlycontinue'
 		
@@ -504,6 +526,9 @@ if($vmCount -gt 0){
 	try{
 		LogMessage("Write data to files")
 		Write-Progress -Activity "Data Collection" -Status "Write to output files"
+		if(-Not $no_resources){
+			$resourceListlist | ConvertTo-Json | Set-Content "$global:outputPath\resources.json" -encoding utf8
+		}
 
 		$global:vmObjectList | Export-Csv -NoTypeInformation -Path "$global:outputPath\vmInfo.csv"
 		$global:vmTagsList | Export-Csv -NoTypeInformation -Path "$global:outputPath\tagInfo.csv"
@@ -518,7 +543,7 @@ if($vmCount -gt 0){
 
 	try{
 		LogMessage("Compressing output files")
-		Compress-Archive -Path "$outputPath\*.csv" -DestinationPath "$(Get-Location)\azure-import-files.zip"
+		Compress-Archive -Path "$outputPath\*.csv", "$outputPath\*.json" -DestinationPath "$(Get-Location)\azure-import-files.zip"
 	}
 	catch{
 		Write-Host "Error compressing output files" -ForegroundColor yellow
@@ -531,6 +556,9 @@ if($no_perf){
 }
 if($no_public_ip){
 	write-host "No public IP data collected"
+}
+if ($no_resources){
+	write-host "Resource data was not collected"
 }
 				
 LogMessage("Collection Completed")
