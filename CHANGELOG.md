@@ -1,3 +1,8 @@
+### 1.4.3 (2022-11-21)
+
+### Bug Fixes
+* Fix scenario where performance data columns are returned in different order to what was requested.
+
 ### 1.4.1 (2022-04-28)
 
 ### Improvement
