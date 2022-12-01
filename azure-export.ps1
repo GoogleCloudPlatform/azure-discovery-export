@@ -503,7 +503,7 @@ foreach ($sub in $subList){
 					ModuleLogMessage -message "Unable to collect performance data for vm. $_" -log $using:LogFile
 				}
 			}
-			$global:vmPerfData = $returnPerfData
+			$global:vmPerfData += $returnPerfData
 			
 			$runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
 			While($runningJobs -ne 0){
