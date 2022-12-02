@@ -107,11 +107,11 @@ function GetMetricTotalValue($metricIndex, $dataIndex, $vmMetric, $ids, $log, $m
     }
     catch{
         $errorMsg = $_.Exception.Message
-		$vmId = $ids.vmID
-		$line = $_.InvocationInfo.ScriptLineNumber
-		$metricName = $metricNameList[$metricIndex]
+	$vmId = $ids.vmID
+	$line = $_.InvocationInfo.ScriptLineNumber
+	$metric = $metricNameList[$metricIndex]
 
-		ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metricName - $errorMsg at $line" $log
+	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log
     }
  
     return "0"
@@ -123,10 +123,11 @@ function GetMetricAverageValue($metricIndex, $dataIndex, $vmMetric, $ids, $log, 
     }
     catch{
         $errorMsg = $_.Exception.Message
-		$vmId = $ids.vmID
-		$line = $_.InvocationInfo.ScriptLineNumber
+	$vmId = $ids.vmID
+	$line = $_.InvocationInfo.ScriptLineNumber
+	$metric = $metricNameList[$metricIndex]
 
-		ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metricName - $errorMsg at $line" $log
+	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log
     }
  
     return "0"
