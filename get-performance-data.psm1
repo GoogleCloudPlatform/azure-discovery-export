@@ -66,9 +66,9 @@ function SetPerformanceInfo{
 		if($vmMetric.Count -gt 5){
 			for($i =0;$i -lt $perfDataCount; $i++){
 				try{
-					$CpuUtilizationPercentage = GetMetricAverageValue $DiskWriteOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
-					$AvailableMemoryBytes = GetMetricAverageValue $DiskWriteOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
-					$DiskReadOperationsPerSec = GetMetricAverageValue $DiskWriteOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
+					$CpuUtilizationPercentage = GetMetricAverageValue $CpuUtilizationPercentageIndex $i  $vmMetric  $ids  $log $metricNameList
+					$AvailableMemoryBytes = GetMetricAverageValue $AvailableMemoryBytesIndex $i  $vmMetric  $ids  $log $metricNameList
+					$DiskReadOperationsPerSec = GetMetricAverageValue $DiskReadOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
 					$DiskWriteOperationsPerSec = GetMetricAverageValue $DiskWriteOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
 					$NetworkBytesPerSecSent = GetMetricTotalValue $NetworkBytesPerSecOutIndex  $i  $vmMetric  $ids  $log $metricNameList
 					$NetworkBytesPerSecReceived = GetMetricTotalValue $NetworkBytesPerSecInIndex  $i  $vmMetric  $ids  $log $metricNameList
