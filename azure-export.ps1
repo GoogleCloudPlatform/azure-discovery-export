@@ -422,6 +422,11 @@ foreach ($sub in $subList){
         $vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | Where-Object{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
         $vmStatusInfo = Get-AzVM -Name $vm.Name -ResourceGroupName $vm.ResourceGroupName -Status -erroraction 'silentlycontinue'
         
+        # Skip over non-running VMs
+        if ($vmStatusInfo.Statuses[1].DisplayStatus -ne 'VM running') {
+          continue
+        }
+        
         if($vmSizeInfo -and $vmStatusInfo) {
             $ipInfo = GetVmIpinfo($vm)
         
