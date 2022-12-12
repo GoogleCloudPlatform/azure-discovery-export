@@ -1,3 +1,8 @@
+### 1.4.4 (2022-12-21)
+
+### Bug Fixes
+* Add additional performance data verification
+
 ### 1.4.3 (2022-11-21)
 
 ### Bug Fixes

@@ -80,7 +80,7 @@ function SetPerformanceInfo{
 						"AvailableMemoryBytes" = CheckMetricValue([math]::ceiling($AvailableMemoryBytes))
 						"DiskReadOperationsPerSec" = CheckMetricValue([math]::Round(([decimal]$DiskReadOperationsPerSec),10))
 						"DiskWriteOperationsPerSec" = CheckMetricValue([math]::Round([decimal]$DiskWriteOperationsPerSec,10))
-						"NetworkBytesPerSecSent " = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecSent)
+						"NetworkBytesPerSecSent" = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecSent)
 						"NetworkBytesPerSecReceived" = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecReceived)
 					}
 					$vmPerfObjectList += $vmPerfMetrics

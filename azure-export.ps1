@@ -13,7 +13,7 @@ limitations under the License.
 
 #>
 
-# Version 1.4.3
+# Version 1.4.4
 
 
 [cmdletbinding()]
@@ -78,7 +78,24 @@ function LogMessage
 	}
 }
 
+#check if disk size is valid
+function CheckDiskSizeValue(){
+	param
+	(
+		[Parameter(Mandatory = $true)]
+			$diskSize
+	)
+		if([string]::IsNullOrEmpty($diskSize)){
+			return 0
+		}
 
+		if ($diskSize -gt 0){
+			return $diskSize
+		}
+		else {
+			return 0
+		}
+}
 
 #get disk info for deallocated VM
 function GetDiskInfoForPoweredOffVm{
@@ -145,7 +162,7 @@ Function SetDiskInfo{
       	$vmDataDisk = [pscustomobject]@{
 				"MachineId"=$vm.VmId
 				"DiskLabel"=$disk.Name
-				"SizeInGib"=$diskSize 
+				"SizeInGib"= CheckDiskSizeValue($diskSize) 
 				"UsedInGib"=""
 				"StorageTypeLabel"=$diskType
 			}
@@ -185,7 +202,7 @@ Function SetDiskInfo{
 	$vmOsDisk = [pscustomobject]@{
 		"MachineId"=$vm.VmId
 		"DiskLabel"=$vm.StorageProfile.OSDisk.Name
-		"SizeInGib"= $diskSize
+		"SizeInGib"= CheckDiskSizeValue($diskSize)
 		"UsedInGib"=""
 		"StorageTypeLabel"=$diskType
 	}
@@ -285,24 +302,33 @@ function GetVmIpinfo{
 	$ipInfo.publicIp = ""
 
 	foreach($nic in $vm.NetworkProfile.NetworkInterfaces){
-		$nicConfig = Get-AzResource -ResourceId $nic.Id | Get-AzNetworkInterface
+		try{
+			$nicConfig = Get-AzResource -ResourceId $nic.Id | Get-AzNetworkInterface
 
-		foreach($ipConfig in $nicConfig.IpConfigurations){
-			$ipInfo.ipList = $ipInfo.ipList + $ipConfig.PrivateIpAddress + ";"
+			foreach($ipConfig in $nicConfig.IpConfigurations){
+				$ipInfo.ipList = $ipInfo.ipList + $ipConfig.PrivateIpAddress + ";"
 
-			if(-Not $no_public_ip){
-				foreach($pip in $ipConfig.PublicIpAddress){
-					$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
-					if($pubIp.IpAddress -ne "Not Assigned" -And ![string]::IsNullOrWhiteSpace($pubIp.IpAddress)){
-						$ipInfo.publicIp = $pubIp.IpAddress 
-						$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+				if(-Not $no_public_ip){
+					foreach($pip in $ipConfig.PublicIpAddress){
+						$pubIp = Get-AzResource -ResourceId $pip.id | Get-AzPublicIpAddress
+						if($pubIp.IpAddress -ne "Not Assigned" -And ![string]::IsNullOrWhiteSpace($pubIp.IpAddress)){
+							$ipInfo.publicIp = $pubIp.IpAddress 
+							$ipInfo.ipList = $ipInfo.ipList + $pubIp.IpAddress + ";"
+						}
 					}
 				}
+				
+				if ([string]::IsNullOrWhiteSpace($ipInfo.primaryIp)){
+					$ipInfo.primaryIp = $ipConfig.PrivateIpAddress
+				}
 			}
-			
-			if ([string]::IsNullOrWhiteSpace($ipInfo.primaryIp)){
-				$ipInfo.primaryIp = $ipConfig.PrivateIpAddress
-			}
+		}
+		catch{
+			$errorMsg = $_.Exception.Message
+			$vmId = $vm.VmId
+			$line = $_.InvocationInfo.ScriptLineNumber
+	
+			LogMessage "Error - GetVmIpinfo - vmid:$vmId - $errorMsg at $line"
 		}
 	}
 	if($ipInfo.ipList.Length -gt 1){
