@@ -13,7 +13,7 @@ limitations under the License.
 
 #>
 
-# Version 1.4.4
+# Version 1.5.1
 
 
 [cmdletbinding()]
@@ -60,6 +60,7 @@ $global:LogFile = "$outputPath\stratozone-azure-export.log"
 $ipInfo = [PSCustomObject]@{
     publicIp     = ""
     primaryIp    = ""
+	primaryMac   = ""
     ipList       = ""
   }
 
@@ -264,6 +265,7 @@ function GetVssVmIpInfo{
 	$ipInfo.primaryIp = ""
 	$ipInfo.ipList = ""
 	$ipInfo.publicIp = ""
+	$ipInfo.primaryMac = ""
 
 	foreach($nic in $vm.NetworkProfile.NetworkInterfaces){
 		$nicConfig = Get-AzResource -ResourceId $nic.Id 
@@ -272,6 +274,9 @@ function GetVssVmIpInfo{
 	
 			if ([string]::IsNullOrWhiteSpace($ipInfo.primaryIp)){
 				$ipInfo.primaryIp = $ipConfig.Properties.PrivateIpAddress
+			}
+			if ([string]::IsNullOrWhiteSpace(	$ipInfo.primaryMac)){
+				$ipInfo.primaryMac = $nicConfig.Properties.MacAddress
 			}
 		}
 	}
@@ -300,6 +305,7 @@ function GetVmIpinfo{
 	$ipInfo.primaryIp = ""
 	$ipInfo.ipList = ""
 	$ipInfo.publicIp = ""
+	$ipInfo.primaryMac = ""
 
 	foreach($nic in $vm.NetworkProfile.NetworkInterfaces){
 		try{
@@ -321,6 +327,9 @@ function GetVmIpinfo{
 				if ([string]::IsNullOrWhiteSpace($ipInfo.primaryIp)){
 					$ipInfo.primaryIp = $ipConfig.PrivateIpAddress
 				}
+				if ([string]::IsNullOrWhiteSpace($ipInfo.primaryMac)){
+					$ipInfo.primaryMac = $nicConfig.MacAddress
+				}
 			}
 		}
 		catch{
@@ -336,6 +345,44 @@ function GetVmIpinfo{
 	}
 
 	return $ipInfo
+}
+
+function IsValidVmStatus{
+	param
+	(
+		[Parameter(Mandatory = $true)]
+		$vmStatusInfo
+	)
+	try
+	{
+		$vmStatus = $vmStatusInfo.Statuses[1].DisplayStatus
+		if($vmStatus -eq "Deleting"){
+			return $false
+		}
+	}
+	catch{
+		$errorMsg = $_.Exception.Message
+		LogMessage "Error - IsValidVmStatus - value:$vmStatus - $errorMsg"
+	}
+
+	return $true
+}
+
+function FormatDateToISO{
+	param
+	(
+		[Parameter(Mandatory = $true)]
+		$dateTime
+	)
+	try
+	{
+		return $dateTime.ToString("yyyy/MM/dd HH:mm:ss")
+	}
+	catch{
+		$errorMsg = $_.Exception.Message
+		LogMessage "Error - FormatDateToISO - value:$dateTime - $errorMsg"
+		return $dateTime
+	}
 }
 
 #Add VM info to the global array for specified VM
@@ -362,11 +409,17 @@ function SetVmInfo{
 		[Parameter(Mandatory = $true)]
 		$vmSizeName
 	)
+	
+	$tmpTimeStamp = ""
+	if ($vmStatusInfo.Statuses[0].Time){
+		$tmpTimeStamp = FormatDateToISO($vmStatusInfo.Statuses[0].Time)
+	}
 
 	$vmBasicInfo = [pscustomobject]@{
 		"MachineId"=$vm.VmId
 		"MachineName"=$vm.Name
 		"PrimaryIPAddress"=$ipInfo.primaryIp
+		"PrimaryMACAddress"=$ipInfo.primaryMac
 		"PublicIPAddress"=$ipInfo.publicIp
 		"IpAddressListSemiColonDelimited"=$ipInfo.ipList
 		"TotalDiskAllocatedGiB"=""
@@ -381,10 +434,9 @@ function SetVmInfo{
 		"OsVersion"=$vm.StorageProfile.ImageReference.Sku
 		"MachineStatus"=$vmStatusInfo.Statuses[1].DisplayStatus
 		"ProvisioningState"=$vmStatusInfo.Statuses[0].DisplayStatus
-		"CreateDate"=$vmStatusInfo.Statuses[0].Time
+		"CreateDate"=$tmpTimeStamp
 		"IsPhysical"="0"
 		"Source"="Azure"
-
 	}
 
 	$global:vmObjectList += $vmBasicInfo
@@ -445,9 +497,17 @@ foreach ($sub in $subList){
         if($vmCount -eq 0 -or $vmCount % 5 -eq 0){
             Write-Progress -Activity "VM Collection" -Status "$vmCount of $($vmList.Length)"
         }
+				$vmStatusInfo = Get-AzVM -Name $vm.Name -ResourceGroupName $vm.ResourceGroupName -Status -erroraction 'silentlycontinue'
+
+				if($vmStatusInfo){
+					if((IsValidVmStatus($vmStatusInfo)) -eq $false){
+						LogMessage("Unsupported VM status: $vmStatusInfo.Statuses[1].DisplayStatus ")
+						continue
+					}
+				}
+
         $vmSizeInfo = Get-AzVMSize -VMName $vm.Name -ResourceGroupName $vm.ResourceGroupName | Where-Object{$_.Name -eq $vm.HardwareProfile.VmSize} -erroraction 'silentlycontinue'
-        $vmStatusInfo = Get-AzVM -Name $vm.Name -ResourceGroupName $vm.ResourceGroupName -Status -erroraction 'silentlycontinue'
-        
+      
         if($vmSizeInfo -and $vmStatusInfo) {
             $ipInfo = GetVmIpinfo($vm)
         
@@ -460,6 +520,7 @@ foreach ($sub in $subList){
                 $vmPerfIds = [PSCustomObject]@{
                     "vmID"   = $vm.VmId
                     "rid"    = $vm.Id
+					"vmMem"  = $vmSizeInfo.MemoryInMb
                     }
                 $vmPerfList += $vmPerfIds
             }
@@ -472,7 +533,7 @@ foreach ($sub in $subList){
 
     LogMessage("Processing Vmss")
     $vmssList = Get-AzVmss  -erroraction 'silentlycontinue'
-    
+
     foreach($vmss in $vmssList){
         $vmListfromVmss = Get-AzVmssVM -ResourceGroupName $vmss.ResourceGroupName -VMScaleSetName $vmss.Name
         
@@ -481,15 +542,19 @@ foreach ($sub in $subList){
         }
         
         foreach($vmFromVmss in $vmListfromVmss){
-            
-            $vmInfo = Get-AzVmssVM -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
-			if(!$vmInfo){continue}
+            try{
+            	$vmInfo = Get-AzVmssVM -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
+							if(!$vmInfo){continue}
+						}
+						catch{
+							ModuleLogMessage -message "Unable to execute Get-AzVmssVM. $_" -log $using:LogFile
+						}
 
             $vmSizeInfo = Get-AzVMSize -Location $vmInfo.Location | Where-Object{$_.Name -eq $vmInfo.Sku.Name}
-			if(!$vmSizeInfo){continue}
+						if(!$vmSizeInfo){continue}
 
             $vmStatusInfo = Get-AzVmssVM -InstanceView -ResourceGroupName $vmFromVmss.ResourceGroupName -VMScaleSetName $vmss.Name -InstanceID $vmFromVmss.InstanceID
-			if(!$vmStatusInfo){continue}
+						if(!$vmStatusInfo){continue}
             
             $piptxt = ""
             $ipInfo = GetVssVmIpInfo $vmInfo $piptxt
@@ -498,11 +563,12 @@ foreach ($sub in $subList){
             SetVmInfo $vmInfo $ipInfo $vmSizeInfo $vmStatusInfo $vmInfo.Sku.Name
             SetDiskInfo $vmInfo $vmStatusInfo
             
-			#if enabled add vmss vm to perf collection array
+						#if enabled add vmss vm to perf collection array
             if(-Not $no_perf){
                 $vmPerfIds = [PSCustomObject]@{
                     "vmID"   = $vmInfo.VmId
                     "rid"    = $vmInfo.Id
+					"vmMem"  = $vmSizeInfo.MemoryInMb
                     }
                 $vmPerfList += $vmPerfIds
             }
