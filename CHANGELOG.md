@@ -1,4 +1,4 @@
-### 1.5.1 (2022-12-21)
+### 1.5.1 (2023-01-17)
 
 ### Improvement
 * Change datetime format to ISO standard (yyyy-mm-dd hh:mm:ss)
