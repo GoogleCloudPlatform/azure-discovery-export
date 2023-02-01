@@ -387,7 +387,7 @@ $vmCount = 0
 $vmsscount = 0
 # Loop through all subscriptions user has access to
 foreach ($sub in $subList){
-	LogMessage("Processing Subscription $($sub.Name)")
+	LogMessage("Processing Subscription '$($sub.Name)'")
 
 	Select-AzSubscription -SubscriptionId $sub.Id
 	Set-AzContext -SubscriptionId $sub.Id
