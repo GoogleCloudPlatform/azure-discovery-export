@@ -635,7 +635,10 @@ if($vmCount -gt 0){
 
 	try{
 		LogMessage("Compressing output files")
-		Compress-Archive -Path "$outputPath\*.csv", "$outputPath\*.json" -DestinationPath "$(Get-Location)\azure-import-files.zip"
+		Compress-Archive -Path "$outputPath\*.csv" -DestinationPath "$(Get-Location)\vm-azure-import-files.zip"
+		if(-Not $no_resources){
+			Compress-Archive -Path "$outputPath\*.json" -DestinationPath "$(Get-Location)\services-azure-import-files.zip"
+		}
 	}
 	catch{
 		Write-Host "Error compressing output files" -ForegroundColor yellow
