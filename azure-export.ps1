@@ -487,31 +487,42 @@ foreach ($sub in $subList){
     }
     
 	#Collect performance data using parallel processing option
-    try{
-		if(-Not $no_perf){
+    try
+	{
+		if(-not $no_perf)
+		{
 			Write-Progress -Activity "Performance Collection" -Status "$vmCount VMs"
 			LogMessage("Perf Collection using $threadLimit threads")
 			
 			$returnPerfData = $vmPerfList | ForEach-Object -ThrottleLimit $threadLimit -Parallel {
-				try{
+				try
+				{
+					# Import module for retrieving performance data
 					Import-Module "$(Get-Location)/get-performance-data.psm1"
-					if($_){
+
+					if($_)
+					{
+						ModuleLogMessage -message "Collecting performance data for vm '$($_)'" -log $using:LogFile
 						SetPerformanceInfo -ids $_ -log $using:LogFile
 					}
 				}
-				catch{
-					ModuleLogMessage -message "Unable to collect performance data for vm. $_" -log $using:LogFile
+				catch
+				{
+					ModuleLogMessage -message "Unable to collect performance data for vm '$($_)'" -log $using:LogFile
 				}
 			}
+
 			$global:vmPerfData += $returnPerfData
-			
-			$runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
-			While($runningJobs -ne 0){
-				$runningJobs = (Get-Job | Where-Object {($_.State -eq "Running") -or ($_.State -eq "NotStarted")}).count
+
+			do
+			{
+				$runningJobs = Get-Job | Where-Object {($_.State -eq "Running" -or $_.State -eq "NotStarted") -and $_.Name -ne "PowerShell.OnIdle"}
 			}
+			while ($runningJobs.Count -ne 0)
 		}
 	}
-	catch{
+	catch
+	{
 		LogMessage("Error collecting performance. $_")
 	}
 }
