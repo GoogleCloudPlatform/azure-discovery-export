@@ -16,7 +16,7 @@ limitations under the License.
 
 # Solution Overview
 This script collects information from provided Azure account and generates csv files for import into StratoZone for analysis.
-Generated files will be placed in ./output directory and a compress zip file will be created that can be imported directly to StratoZone using the import procedure. 
+Generated files will be placed in ./output directory and compressed as zip files. Created zip files can be imported directly to StratoZone using the import procedure. 
 
 **NOTE:** Script will collect data only on the instances user executing the script has access to. 
 
@@ -54,16 +54,21 @@ cd azure-to-stratozone-export
 
 - Step 6: Verify output file has been generated
 ```
- ls ./azure-import-files.zip
+ ls ./*.zip
 ```
 
 - Step 7: When the script completes, click on Upload/Download files icon.
  !["Image of Cloud Shell Download files"](images/download_output.png)
 
  - Step 8: Enter the path to the output file.
- ```
- /azure-to-stratozone-export/azure-import-files.zip
-```
+    - Step 8a: For virtual machine collection
+    ```
+    /azure-to-stratozone-export/vm-azure-import-files.zip
+    ```
+    - Step 8b: For managed service collection
+    ```
+    /azure-to-stratozone-export/services-azure-import-files.zip
+    ```
 
  - Step 9: Click Download. File is ready for import into StratoZone portal.
 
