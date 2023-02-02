@@ -1,3 +1,15 @@
+### 1.5.1 (2023-01-17)
+
+### Improvement
+* Change datetime format to ISO standard (yyyy-mm-dd hh:mm:ss)
+* Add PrimaryMACAddress column to vmInfo data file
+* Add MemoryUtilizationPercentage column to perfInfo file
+
+### 1.4.4 (2022-12-21)
+
+### Bug Fixes
+* Add additional performance data verification
+
 ### 1.4.3 (2022-11-21)
 
 ### Bug Fixes

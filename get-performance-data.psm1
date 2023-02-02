@@ -19,6 +19,20 @@ function CheckMetricValue{
 		}
 }
 
+function FormatDateToISO{
+	param
+	(
+		[Parameter(Mandatory = $true)]
+		$dateTime
+	)
+	try{
+		return $dateTime.ToString("yyyy/MM/dd HH:mm:ss")
+	}
+	catch{
+		ModuleLogMessage "Error - FormatDateToISO - value:$dateTime - $_.Exception.Message" $log
+		return $dateTime
+	}
+}
 
 function SetPerformanceInfo{
 	param
@@ -37,13 +51,14 @@ function SetPerformanceInfo{
 		$metricName = "Percentage CPU,Available Memory Bytes,Disk Read Operations/Sec,Disk Write Operations/Sec,Network Out Total,Network In Total"
 		$vmMetric = Get-AzMetric -ResourceId $ids.rid -MetricName $metricName -EndTime $endTime -StartTime  $startTime -TimeGrain 0:30:00 -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
 		
-		$metricNameList = $vmMetric.Name.Value
+ 		$metricNameList = $vmMetric.Name.Value
 
 		if(-not $vmMetric){
 			$vmPerfMetrics = [pscustomobject]@{
 				"MachineId"=$ids.vmID
-				"TimeStamp"=Get-Date -format "MM/dd/yyyy HH:mm:ss"
+				"TimeStamp"=Get-Date -format "yyyy/MM/dd HH:mm:ss"
 				"CpuUtilizationPercentage"=0
+				"MemoryUtilizationPercentage"=0
 				"AvailableMemoryBytes"=0
 				"DiskReadOperationsPerSec"=0
 				"DiskWriteOperationsPerSec"=0
@@ -72,15 +87,17 @@ function SetPerformanceInfo{
 					$DiskWriteOperationsPerSec = GetMetricAverageValue $DiskWriteOperationsPerSecIndex $i  $vmMetric  $ids  $log $metricNameList
 					$NetworkBytesPerSecSent = GetMetricTotalValue $NetworkBytesPerSecOutIndex  $i  $vmMetric  $ids  $log $metricNameList
 					$NetworkBytesPerSecReceived = GetMetricTotalValue $NetworkBytesPerSecInIndex  $i  $vmMetric  $ids  $log $metricNameList
+					$MemoryUtilization = CalculateMemoryUtilization $AvailableMemoryBytes $ids.vmMem
 					
 					$vmPerfMetrics = [pscustomobject]@{
 						"MachineId"=$ids.vmID
-						"TimeStamp"=$vmMetric[0].Data[$i].TimeStamp
+						"TimeStamp"=FormatDateToISO($vmMetric[0].Data[$i].TimeStamp)
 						"CpuUtilizationPercentage" = [math]::Round($CpuUtilizationPercentage,10)
+						"MemoryUtilizationPercentage" = [math]::Round($MemoryUtilization,2)
 						"AvailableMemoryBytes" = CheckMetricValue([math]::ceiling($AvailableMemoryBytes))
 						"DiskReadOperationsPerSec" = CheckMetricValue([math]::Round(([decimal]$DiskReadOperationsPerSec),10))
 						"DiskWriteOperationsPerSec" = CheckMetricValue([math]::Round([decimal]$DiskWriteOperationsPerSec,10))
-						"NetworkBytesPerSecSent " = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecSent)
+						"NetworkBytesPerSecSent" = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecSent)
 						"NetworkBytesPerSecReceived" = CalculateNetworkDataPerSec([decimal]$NetworkBytesPerSecReceived)
 					}
 					$vmPerfObjectList += $vmPerfMetrics
@@ -133,6 +150,21 @@ function GetMetricAverageValue($metricIndex, $dataIndex, $vmMetric, $ids, $log, 
     return "0"
 }
 
+
+function CalculateMemoryUtilization($availableMemory, $vmTotMemory){
+	try{
+		
+			$tmpMemValue = CheckMetricValue($availableMemory)
+			if($tmpMemValue -gt 0){
+				$totMemoryBytes = $vmTotMemory * 1024 * 1024
+				return ((($totMemoryBytes - $tmpMemValue)/$totMemoryBytes) * 100)
+			}
+			return 0
+	}
+	catch{
+		return 0
+	}
+}
 
 
 # Divide the network data by the time period used in the query
