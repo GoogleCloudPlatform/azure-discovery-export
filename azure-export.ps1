@@ -376,7 +376,7 @@ function FormatDateToISO{
 	)
 	try
 	{
-		return $dateTime.ToString("yyyy/MM/dd HH:mm:ss")
+		return $dateTime.ToString("o")
 	}
 	catch{
 		$errorMsg = $_.Exception.Message
