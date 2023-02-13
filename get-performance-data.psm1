@@ -26,7 +26,7 @@ function FormatDateToISO{
 		$dateTime
 	)
 	try{
-		return $dateTime.ToString("o")
+		return $dateTime.ToString("yyyy-MM-ddTHH:mm:ssK")
 	}
 	catch{
 		ModuleLogMessage "Error - FormatDateToISO - value:$dateTime - $_.Exception.Message" $log
@@ -56,7 +56,7 @@ function SetPerformanceInfo{
 		if(-not $vmMetric){
 			$vmPerfMetrics = [pscustomobject]@{
 				"MachineId"=$ids.vmID
-				"TimeStamp"=Get-Date -format "o"
+				"TimeStamp"=Get-Date -format "yyyy-MM-ddTHH:mm:ssK"
 				"CpuUtilizationPercentage"=0
 				"MemoryUtilizationPercentage"=0
 				"AvailableMemoryBytes"=0

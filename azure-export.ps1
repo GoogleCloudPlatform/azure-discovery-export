@@ -13,7 +13,7 @@ limitations under the License.
 
 #>
 
-# Version 1.5.1
+# Version 1.5.2
 
 
 [cmdletbinding()]
@@ -376,7 +376,7 @@ function FormatDateToISO{
 	)
 	try
 	{
-		return $dateTime.ToString("o")
+		return $dateTime.ToString("yyyy-MM-ddTHH:mm:ssK")
 	}
 	catch{
 		$errorMsg = $_.Exception.Message
