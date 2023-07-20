@@ -128,7 +128,7 @@ function GetMetricTotalValue($metricIndex, $dataIndex, $vmMetric, $ids, $log, $m
 	$line = $_.InvocationInfo.ScriptLineNumber
 	$metric = $metricNameList[$metricIndex]
 
-	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log
+	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log, 0
     }
  
     return "0"
@@ -144,7 +144,7 @@ function GetMetricAverageValue($metricIndex, $dataIndex, $vmMetric, $ids, $log, 
 	$line = $_.InvocationInfo.ScriptLineNumber
 	$metric = $metricNameList[$metricIndex]
 
-	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log
+	ModuleLogMessage "Error - module - vmid:$vmId - metricName: $metric - $errorMsg at $line" $log, 0
     }
  
     return "0"
@@ -184,11 +184,15 @@ function ModuleLogMessage
 		[Parameter(Mandatory = $true)]
 		[string]$Message,
 		[Parameter(Mandatory = $true)]
-		[string]$log
+		[string]$log,
+  		[Parameter(Mandatory = $false)]
+		[string]$logLevel = 1,
 	)
 	
 	try{
-    	Add-content $log -value ((Get-Date).ToString() + " - " + $Message)
+ 		if ($logLevel >= $global:LogLevel) {
+   			Add-content $log -value ((Get-Date).ToString() + " - " + $Message)		
+   		}
 	}
 	catch{
 		Write-Host "Unable to Write to log file. $_"
