@@ -60,7 +60,7 @@ $resourceListlist=@()
 $subList = Get-AzSubscription
 $global:outputPath = "$(Get-Location)\output\"
 $global:LogFile = "$outputPath\stratozone-azure-export.log"
-$global:LogLevel = $log_level
+$global:LogLevel = $log_level -eq 'INFO' ? 1 : 0
 
 
 $ipInfo = [PSCustomObject]@{
