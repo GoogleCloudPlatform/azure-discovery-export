@@ -21,7 +21,9 @@ param (
   [switch]$no_perf=$false,
   [int]$threadLimit=30,
   [switch]$no_public_ip=$false,
-  [switch]$no_resources=$false
+  [switch]$no_resources=$false,
+  [ValidateSet('INFO', 'DEBUG')]
+  [System.String]$log_level='INFO'
 )
 <#
 	.DESCRIPTION
@@ -39,6 +41,9 @@ param (
 	.PARAMETER no_resources
 	Default False. Use to indicate whether resource collection is performed.
 
+	.PARAMETER log_level
+	Default 'INFO'. Use to indicate whether the log level is INFO or DEBUG.
+
 	.EXAMPLE
     PS> ./azure-export -no_perf
     PS> ./azure-export -threadLimit 40
@@ -55,6 +60,7 @@ $resourceListlist=@()
 $subList = Get-AzSubscription
 $global:outputPath = "$(Get-Location)\output\"
 $global:LogFile = "$outputPath\stratozone-azure-export.log"
+$global:LogLevel = $log_level
 
 
 $ipInfo = [PSCustomObject]@{
@@ -588,7 +594,7 @@ foreach ($sub in $subList){
 				try{
 					Import-Module "$(Get-Location)/get-performance-data.psm1"
 					if($_){
-						SetPerformanceInfo -ids $_ -log $using:LogFile
+						SetPerformanceInfo -ids $_ -log $using:LogFile 
 					}
 				}
 				catch{
