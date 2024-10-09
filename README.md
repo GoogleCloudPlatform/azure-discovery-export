@@ -52,6 +52,8 @@ cd azure-to-stratozone-export
 ./azure-export.ps1
 ```
 
+**NOTE:** When the target environment includes a lot of machines or has poor connectivity to them, the Azure credentials might time out before finish to collect all the data. One possible mitigation is to run repeated collections on multiple subsets of machines.
+
 - Step 6: Verify output file has been generated
 ```
  ls ./*.zip
